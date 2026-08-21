@@ -2,3 +2,4 @@
 *.tmp
 lichess_db_puzzle.csv
 TODO
+*.zst

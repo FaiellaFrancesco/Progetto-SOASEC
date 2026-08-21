@@ -1,25 +1,22 @@
 import pandas as pd
 import re
 
-themes = [
-    'mateIn1',
-    'mateIn2',
-    'mateIn3',
-    'mateIn4',
-    'mateIn5'
-]
-
-
 if __name__ == '__main__':
     df = pd.read_csv('../dataset/lichess_db_puzzle.csv')
 
-    df = df[df['Themes'].str.contains(r'mateIn\d', na=False)]
+    # get mateInN problems
+    pattern = r'\b(mateIn[1-5])\b'
+    df = df[df['Themes'].str.contains(
+        r'\b(mateIn[1-5])\b', regex=True, na=False)].copy()
 
-    c = []
-    for t in themes:
-        c.append(len(df[df['Themes'].str.contains(t)]))
+    # extract mate tag into a new column
+    df['MateIn'] = df['Themes'].str.extract(
+        r'\bmateIn([1-5])\b', expand=False).astype('Int64')
 
-    for i, n in enumerate(c):
-        print(f'mateIn{i+1}: {n/len(df)}% - {n}')
+    counts = df['MateIn'].value_counts()
+
+    for n in range(1, 6):
+        c = counts.get(n)
+        print(f'MateIn{n}: {c} - {c/len(df) or 0:.3f}%')
 
     df.to_csv('../dataset/lichess_db_puzzle_mates_only.csv')

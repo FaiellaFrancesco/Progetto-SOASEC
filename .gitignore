@@ -1,2 +1,10 @@
+# DIRECTORIES
+.venv
+.venv/*
+
+# DATATYPES
 *.tmp
+
+# DATASETS
 lichess_db_puzzle.csv
+lichess_db_puzzle_mates_only.csv

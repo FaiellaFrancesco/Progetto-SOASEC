@@ -4,7 +4,8 @@
 
 # DATATYPES
 *.tmp
-
+.~lock
 # DATASETS
+dataset/*
 lichess_db_puzzle.csv
 lichess_db_puzzle_mates_only.csv

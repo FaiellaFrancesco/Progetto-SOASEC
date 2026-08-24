@@ -7,19 +7,8 @@
 ##Test:
 ##000Zo,4r3/1k6/pp3r2/1b2P2p/3R1p2/P1R2P2/1P4PP/6K1 w - - 0 35,e5f6 e8e1 g1f2 e1f1,1363,76,86,655,endgame mate mateIn2 operaMate short,https://lichess.org/n8Ff742v#69,,
 
-## This is used to build a graph of the chess positions and their relationships
-## INPUT: lichess_db_puzzle.csv filtered with fen, moves, rating, themes 
-## OUTPUT: graph.json with nodes and edges representing the chess positions and their relationships
-
-import csv
-import json
 import chess
 import numpy as np
-
-
-"""
-
-"""
 
 def normalize_row(row):
     # Normalize the row 
@@ -129,7 +118,7 @@ OUTPUT:List of moves encoded as a score
 example the move "e8e1" = from 60 to  4 in y= 3844
 in fact:
 3844 //64 = 60 -> e8 and
-3864 % 64 = 4  -> e1
+3844 % 64 = 4  -> e1
 
 
 

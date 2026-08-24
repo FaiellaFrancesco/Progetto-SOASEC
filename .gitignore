@@ -3,3 +3,4 @@
 lichess_db_puzzle.csv
 TODO
 *.zst
+.DS_Store

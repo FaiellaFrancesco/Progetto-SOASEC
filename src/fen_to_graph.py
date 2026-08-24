@@ -170,7 +170,7 @@ y stays ONE move for examples, every later moves belongs to a different position
 def row_to_graph(row,use_timing=False, unroll=True):
     row=normalize_row(row)
     moves=row["Moves"]
-    n_total=len(moves)/2 #total moves for the resolver to solve the puzzle
+    n_total=len(moves)//2 #total moves for the resolver to solve the puzzle
     if n_total < 1:
         return []
     

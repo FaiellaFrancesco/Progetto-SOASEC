@@ -1,10 +1,15 @@
+<<<<<<< HEAD
 # DIRECTORIES
 .venv
 .venv/*
 
 # DATATYPES
+=======
+.venv/
 *.tmp
 .~lock
+*.zst
+.DS_Store
 # DATASETS
 dataset/*
 lichess_db_puzzle.csv

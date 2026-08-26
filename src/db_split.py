@@ -10,9 +10,7 @@ def parse_args():
     parser.add_argument('-i',
                         "--input_path",
                         type=str,
-                        required=True,
-                        )
-    parser.add_argument(
+                        required=True,) parser.add_argument(
         '-o',
         "--output_dir",
         type=str,

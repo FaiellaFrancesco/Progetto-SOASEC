@@ -167,6 +167,22 @@ the model doesnt know the rules of chess
 def build_legal_moves(board):
     idx = [m.from_square * 64 + m.to_square for m in board.legal_moves]
     return np.unique(np.array(idx, dtype=np.int16))
+
+
+"""
+INPUT: rating of the puzzles, n_remaining ( solver still need to play), n_legal (number of legals moves in this position)
+OUTOUT: simulated think time, normalised in [0,1]
+
+2.0,20,0.35,0,02 are handtuned values for human thinking time
+
+"""
+def simulate_think_time(rating,n_remaining,n_legal):
+    base = 2.0 + 18.0 * (rating - 400) / 2600.0    # ~2..20 s across the rating range
+    depth = 1.0 + 0.35 * (n_remaining - 1)         # the first move takes the longest
+    branch = 1.0 + 0.02 * (n_legal - 20)           # more options, more time to discard
+    seconds = base * depth * branch
+    return min(max(seconds / 60.0, 0.0), 1.0) 
+
 """
 Lichess only tags mateIn1..5, so a deeper mate has no tag 
 
@@ -184,7 +200,6 @@ in a matein puzzle the solver plays n move and the opponet n-1, so the solution 
 
 y stays ONE move for examples, every later moves belongs to a different position that does not exist yet. The full move list is saved as metadata under "solution"
 """
-
 def row_to_graph(row,use_timing=False, unroll=True):
     row=normalize_row(row)
     moves=row["Moves"]
@@ -216,12 +231,15 @@ def row_to_graph(row,use_timing=False, unroll=True):
     for uci in solution: 
         if board.turn == solver:
             k=k+1
+            n_remaining=n_total-k+1
+            legal=build_legal_moves(board)
             x=build_node_features(board)
             edge_index, edge_attr = build_edge(board)
+            t_value= None #if we not use time
             if use_timing:
-                t = np.full((64, 1), row["Rating"] / 3000.0, dtype=np.float32)
+                t_value=simulate_think_time(row['Rating'],n_remaining,len(legal))
+                t = np.full((64, 1), t_value, dtype=np.float32)
                 x = np.concatenate([x, t], axis=1)
-
             examples.append({
            # what the network reads
             "x": x,
@@ -229,7 +247,9 @@ def row_to_graph(row,use_timing=False, unroll=True):
             "edge_attr": edge_attr,
             # what it has to predict
             "y": build_label([uci]),
-            "legal_moves": build_legal_moves(board),
+            "legal_moves": legal,
+            "n_remaining": n_remaining,
+            "think_time": t_value, 
             # bookkeeping: for analysis, not for the network
             "n_remaining": n_total - k + 1,   # true depth of THIS position
             "puzzle_n": n_total,              # depth of the whole puzzle

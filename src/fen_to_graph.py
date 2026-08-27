@@ -103,7 +103,7 @@ def build_node_features(board):
 """
 INPUT:chess.board object
 OUTPUT: edge_index, numpy array of shape (2, E) 
-        edge_attr, numpy array of shape (E, 3) 
+        edge_attr, numpy array of shape (E, 4) 
 The edges are directed and represent the relationships between the pieces on the board.ù
 
 """
@@ -202,7 +202,12 @@ def row_to_graph(row,use_timing=False, unroll=True):
     board, solution = get_puzzle_position(row)
     if board is None:
         return []    
-    
+   #we check if the moves len is more than 4,yes: it's a promotion, then we check the last c to check if is a rook
+   # or a bishop or knight.
+   ## We only use promotion to queen.  
+    if any(len(m) == 5 and m[4] in "rbn" for m in solution[::2]):
+        return []
+
     solver=board.turn #who moves now is the solver
 
     examples=[]
@@ -422,7 +427,6 @@ def run_tests():
     print(f"\n{sum(RESULTS)}/{len(RESULTS)} checks passed")
     print("everything works" if all(RESULTS)
           else "something is broken, look at the FAIL lines above")
- 
  
 if __name__ == "__main__":
     run_tests()

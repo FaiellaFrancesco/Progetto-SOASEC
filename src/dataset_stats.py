@@ -15,7 +15,7 @@ def load_data(file_path):
 def plot_mates_in_distribution(df, output_dir):
     """Plots the distribution of the 'y' column (MatesIn)."""
     plt.figure(figsize=(10, 6))
-    sns.countplot(data=df, x='y', palette='viridis')
+    sns.countplot(data=df, x='n_remaining', palette='viridis')
     plt.title('Distribution of MatesIn (y)')
     plt.xlabel('Mate In (Moves)')
     plt.ylabel('Frequency')

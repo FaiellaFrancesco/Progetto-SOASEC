@@ -3,6 +3,7 @@ import os
 import glob
 import argparse
 import pandas as pd
+from tqdm import tqdm
 
 
 def merge_parquets(input_dirs, output_dir, hash_col):
@@ -14,7 +15,8 @@ def merge_parquets(input_dirs, output_dir, hash_col):
     if not files:
         return
 
-    full_df = pd.concat([pd.read_parquet(f) for f in files], ignore_index=True)
+    for f in tqdm(files):
+        full_df = pd.concat([pd.read_parquet(f)], ignore_index=True)
     # Drop duplicates on hash, keeping the top row
     # full_df.drop_duplicates(subset=[hash_col], keep='first', inplace=True)
 
@@ -27,7 +29,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--inputs', nargs='+', required=True)
     parser.add_argument('-o', '--output', required=True)
-    parser.add_argument('--label_col', default='labels')
+    parser.add_argument('--hash_col', default='id')
 
     args = parser.parse_args()
     merge_parquets(args.inputs, args.output, args.hash_col)

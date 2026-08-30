@@ -235,7 +235,12 @@ def row_to_graph(row,use_timing=False, unroll=True):
 
     examples=[]
     k=0 #how many solver moves have been applied
-
+    replay= board.copy() # we need to validate the line first
+    try:
+        for uci in solution:
+            replay.push_uci(uci)
+    except ValueError:
+        return []
     for uci in solution: 
         if board.turn == solver:
             k=k+1
@@ -473,7 +478,12 @@ def run_tests():
           len(row_to_graph({**TEST_ROW, "MateIn": float("nan")})) == 2)
     check("a broken FEN drops the row",
           len(row_to_graph({**TEST_ROW, "FEN": "nope"})) == 0)
-
+    print("\n--- corrupt line handling ---")
+    for name, mv in [("malformed move mid-line", "e5f6 e8e1 zzzz e1f1"),
+                     ("illegal move mid-line",   "e5f6 e8e1 a1a2 e1f1"),
+                     ("illegal move at the end", "e5f6 e8e1 g1f2 h8h1")]:
+        check(f"{name} drops the row instead of raising",
+              len(row_to_graph({**TEST_ROW, "Moves": mv})) == 0)   
 	    # ---------------- edge recency ----------------
     print("\n--- edge recency ---")
 

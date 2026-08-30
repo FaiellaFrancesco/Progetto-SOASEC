@@ -222,9 +222,7 @@ def row_to_graph(row,use_timing=False, unroll=True):
     board, solution = get_puzzle_position(row)
     if board is None:
         return []    
-   #we check if the moves len is more than 4,yes: it's a promotion, then we check the last c to check if is a rook
-   # or a bishop or knight.
-   ## We only use promotion to queen.  
+    # We only keep queen promotions. Drop puzzles where the solver under-promotes.
     if any(len(m) == 5 and m[4] in "rbn" for m in solution[::2]):
         return []
     

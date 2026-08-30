@@ -170,10 +170,10 @@ def build_legal_moves(board):
 
 
 """
-INPUT: rating of the puzzles, n_remaining ( solver still need to play), n_legal (number of legals moves in this position)
-OUTOUT: simulated think time, normalised in [0,1]
+INPUT: rating of the puzzle, n_remaining (solver moves left), n_legal (number of legal moves in this position)
+OUTPUT: simulated think time, normalised to [0, 1]
 
-2.0,20,0.35,0,02 are handtuned values for human thinking time
+2.0, 18.0, 0.35, 0.02 and 60.0 are hand-tuned values for plausible human think time.
 
 """
 def simulate_think_time(rating,n_remaining,n_legal):

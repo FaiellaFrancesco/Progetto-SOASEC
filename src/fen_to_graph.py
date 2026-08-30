@@ -1,25 +1,33 @@
-
 # WHY THIS EXISTS
 # The project compares a GNN against an LLM on mate-in-n puzzles.
 # The LLM gets the FEN as text and must infer piece relationships itself.
 # This encoder hands the GNN those relationships explicitly, as typed edges.
 
-##Test:
-##000Zo,4r3/1k6/pp3r2/1b2P2p/3R1p2/P1R2P2/1P4PP/6K1 w - - 0 35,e5f6 e8e1 g1f2 e1f1,1363,76,86,655,endgame mate mateIn2 operaMate short,https://lichess.org/n8Ff742v#69,,
+# Test:
+# 000Zo,4r3/1k6/pp3r2/1b2P2p/3R1p2/P1R2P2/1P4PP/6K1 w - - 0 35,e5f6 e8e1 g1f2 e1f1,1363,76,86,655,endgame mate mateIn2 operaMate short,https://lichess.org/n8Ff742v#69,,
 
 import chess
 import numpy as np
+from tests import fen_to_graph_tests
+
+NODE_FEATURES = ["pawn", "knight", "bishop", "rook", "queen",
+                 "king", "white", "black", "empty", "file", "rank", "white_to_move"]
+PIECE_TYPES = [chess.PAWN, chess.KNIGHT, chess.BISHOP, chess.ROOK,
+               chess.QUEEN, chess.KING]  # for a pawns a moves edge means control,
+EDGE_TYPES = ["attacks", "defends", "moves", "pushes"]
+
 
 def normalize_row(row):
-    # Normalize the row 
-    r=dict(row)
+    # Normalize the row
+    r = dict(row)
     if isinstance(r["Moves"], str):
-        r["Moves"]=r["Moves"].split()
+        r["Moves"] = r["Moves"].split()
     if isinstance(r["Themes"], str):
-        r["Themes"]=r["Themes"].split()
+        r["Themes"] = r["Themes"].split()
     if isinstance(r["Rating"], str):
-        r["Rating"]=int(r["Rating"])
+        r["Rating"] = int(r["Rating"])
     return r
+
 
 """
 INPUT: row from the CSV file
@@ -35,15 +43,15 @@ def get_puzzle_position(row):
     # Also the FEN is one Move before the puzzle, so we need to apply the moves to the board to get the position of the puzzle
     try:
         board = chess.Board(row["FEN"])
-        board.push_uci(row["Moves"][0])  # Apply the first move to get the puzzle position
-        return board,row["Moves"][1:]  # Return the board and the remaining moves
+        # Apply the first move to get the puzzle position
+        board.push_uci(row["Moves"][0])
+        # Return the board and the remaining moves
+        return board, row["Moves"][1:]
     except ValueError:
         print(f"Invalid FEN: {row['FEN']}")
-        return None,None
+        return None, None
 
-NODE_FEATURES = ["pawn", "knight", "bishop", "rook", "queen", "king", "white", "black", "empty", "file", "rank", "white_to_move"]
-PIECE_TYPES= [chess.PAWN, chess.KNIGHT, chess.BISHOP, chess.ROOK, chess.QUEEN, chess.KING]
-EDGE_TYPES = ["attacks", "defends", "moves","pushes"] #for a pawns a moves edge means control, 
+
 """
 INPUT: chess.board,the pawn's square
 OUTPUT:list of squares the pawn can advance to 
@@ -52,19 +60,21 @@ Legal move only covers the sive to move and we want to be able the pushes of bot
 
 
 """
-def pawn_pushes(board,square,piece):
-    if piece.color==chess.WHITE:    
-        step=8
-        start_rank=1
+
+
+def pawn_pushes(board, square, piece):
+    if piece.color == chess.WHITE:
+        step = 8
+        start_rank = 1
     else:
-        step=-8
-        start_rank=6
-    targets=[]
-    one=square+step
-    if 0<=one<64 and board.piece_at(one) is None:
+        step = -8
+        start_rank = 6
+    targets = []
+    one = square+step
+    if 0 <= one < 64 and board.piece_at(one) is None:
         targets.append(one)
-        two=square+2*step
-        if chess.square_rank(square)==start_rank and 0 <=two<64  and board.piece_at(two) is None:
+        two = square+2*step
+        if chess.square_rank(square) == start_rank and 0 <= two < 64 and board.piece_at(two) is None:
             targets.append(two)
 
     return targets
@@ -78,27 +88,32 @@ which color it is, whather it is empty, where where it sits on the board, and wh
 
 """
 
+
 def build_node_features(board):
-    x= np.zeros((64, len(NODE_FEATURES)), dtype=np.float32)
+    x = np.zeros((64, len(NODE_FEATURES)), dtype=np.float32)
 
     for square in range(64):
-        piece=board.piece_at(square)
+        piece = board.piece_at(square)
         if piece is None:
-            x[square,8] = 1.0 # empty (no piece in that square)
+            x[square, 8] = 1.0  # empty (no piece in that square)
         else:
-            x[square,PIECE_TYPES.index(piece.piece_type)] = 1.0 # which piece type is on that square
+            # which piece type is on that square
+            x[square, PIECE_TYPES.index(piece.piece_type)] = 1.0
             if piece.color == chess.WHITE:
-                x[square,6] = 1.0 # white piece
+                x[square, 6] = 1.0  # white piece
             else:
-                x[square,7] = 1.0 # black piece
+                x[square, 7] = 1.0  # black piece
 
-        x[square,9] = square % 8 / 7.0 # file (column) of the square, normalized to [0,1]
-        x[square,10] = square // 8 / 7.0 # rank (row) of the square, normalized to [0,1]
+        # file (column) of the square, normalized to [0,1]
+        x[square, 9] = square % 8 / 7.0
+        # rank (row) of the square, normalized to [0,1]
+        x[square, 10] = square // 8 / 7.0
         if board.turn == chess.WHITE:
-            x[square,11] = 1.0 # white to move
+            x[square, 11] = 1.0  # white to move
         else:
-            x[square,11] = 0.0 # black to move
+            x[square, 11] = 0.0  # black to move
     return x
+
 
 """
 INPUT:chess.board object
@@ -107,6 +122,8 @@ OUTPUT: edge_index, numpy array of shape (2, E)
 The edges are directed and represent the relationships between the pieces on the board.
 
 """
+
+
 def build_edge(board):
     sources, targets, kinds = [], [], []
 
@@ -140,6 +157,7 @@ def build_edge(board):
 
     return edge_index, edge_attr
 
+
 """
 INPUT:List of moves
 OUTPUT:List of moves encoded as a score
@@ -152,9 +170,13 @@ in fact:
 
 
 """
+
+
 def build_label(solution):
     move = chess.Move.from_uci(solution[0])
     return move.from_square * 64 + move.to_square
+
+
 """
 INPUT: chess.Board object
 OUTPUT: numpy array of the legal moves, encoded like y
@@ -211,14 +233,13 @@ def row_to_graph(row,use_timing=False, unroll=True):
     n_total=len(moves)//2 #total moves for the resolver to solve the puzzle
     if n_total < 1:
         return []
-    
     try:
-        tagged=int(row["MateIn"])
+        tagged = int(row["MateIn"])
     except (KeyError, ValueError, TypeError):
-        tagged=None
+        tagged = None
     if tagged is not None and tagged > 0 and tagged != n_total:
-        return [] #skip puzzles that are tagged with a different mate-in than the number of moves in the puzzle
-    
+        return []  # skip puzzles that are tagged with a different mate-in than the number of moves in the puzzle
+
     board, solution = get_puzzle_position(row)
     if board is None:
         return []    
@@ -275,7 +296,7 @@ def row_to_graph(row,use_timing=False, unroll=True):
         })
 
             if not unroll:
-                break 
+                break
 
         move=chess.Move.from_uci(uci)
         board.push(move)
@@ -552,4 +573,4 @@ def run_tests():
           else "something is broken, look at the FAIL lines above")
  
 if __name__ == "__main__":
-    run_tests()
+    fen_to_graph_tests()

@@ -1,6 +1,14 @@
-.venv/
+# DIRECTORIES
+.venv
+.venv/*
+__pycache__
+__pycache__/*
+# DATATYPES
 *.tmp
-lichess_db_puzzle.csv
-TODO
+.~lock*
 *.zst
-.DS_Store
+.DS_Store*
+# DATASETS
+dataset/*
+lichess_db_puzzle.csv
+lichess_db_puzzle_mates_only.csv

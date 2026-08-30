@@ -104,7 +104,7 @@ def build_node_features(board):
 INPUT:chess.board object
 OUTPUT: edge_index, numpy array of shape (2, E) 
         edge_attr, numpy array of shape (E, 4) 
-The edges are directed and represent the relationships between the pieces on the board.ù
+The edges are directed and represent the relationships between the pieces on the board.
 
 """
 def build_edge(board):

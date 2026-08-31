@@ -148,9 +148,8 @@ def fen_to_graph_tests():
     for flag in (False, True):
         ex = row_to_graph(TEST_ROW, use_timing=flag)
         check(f"use_timing={flag}: 2 examples", len(ex) == 2, len(ex))
-        x_shape = np.array(ex[0]["x"]).shape
         check(f"use_timing={flag}: x has {13 if flag else 12} features",
-              x_shape == (64, 13 if flag else 12), x_shape)
+              ex[0]["x"].shape == (64, 13 if flag else 12), ex[0]["x"].shape)
 
     ex = row_to_graph(TEST_ROW)
     check("labels are 3844 then 261", [e["y"] for e in ex] == [3844, 261])
@@ -162,7 +161,7 @@ def fen_to_graph_tests():
           type(ex[0]["n_remaining"]).__name__)
     check("puzzle_n is an int", isinstance(ex[0]["puzzle_n"], int))
     check("edge_attr is aligned with edge_index",
-          all(len(e["edge_attr"]) == len(e["edge_index"][0]) for e in ex))
+          all(e["edge_attr"].shape[0] == e["edge_index"].shape[1] for e in ex))
     check("unroll=False gives a single example",
           len(row_to_graph(TEST_ROW, unroll=False)) == 1)
     check("an inconsistent MateIn drops the row",
@@ -173,6 +172,52 @@ def fen_to_graph_tests():
           len(row_to_graph({**TEST_ROW, "MateIn": float("nan")})) == 2)
     check("a broken FEN drops the row",
           len(row_to_graph({**TEST_ROW, "FEN": "nope"})) == 0)
+    print("\n--- corrupt line handling ---")
+    for name, mv in [("malformed move mid-line", "e5f6 e8e1 zzzz e1f1"),
+                     ("illegal move mid-line",   "e5f6 e8e1 a1a2 e1f1"),
+                     ("illegal move at the end", "e5f6 e8e1 g1f2 h8h1")]:
+        check(f"{name} drops the row instead of raising",
+              len(row_to_graph({**TEST_ROW, "Moves": mv})) == 0)
+        # ---------------- edge recency ----------------
+    print("\n--- edge recency ---")
+
+    def sources_with(ex, value):
+        ei, et = ex["edge_index"], ex["edge_time"]
+        return sorted({chess.square_name(int(ei[0, j]))
+                       for j in range(ei.shape[1]) if et[j] == value})
+
+    off = row_to_graph(TEST_ROW)
+    on = row_to_graph(TEST_ROW, use_timing=True)
+
+    check("edge_time is None when timing is off",
+          all(e["edge_time"] is None for e in off))
+    check("edge_time is set when timing is on",
+          all(e["edge_time"] is not None for e in on))
+    check("edge_time has one value per edge",
+          all(len(e["edge_time"]) == e["edge_index"].shape[1] for e in on))
+    check("no negative recency", all((e["edge_time"] >= 0).all() for e in on))
+    check("recency never exceeds the unknown default",
+          all((e["edge_time"] <= UNKNOWN_RECENCY).all() for e in on))
+
+    check("example 1: the only piece with a history is f6, the setup move",
+          sources_with(on[0], 0) == ["f6"])
+    check("example 1: f6 generates 3 edges",
+          int((on[0]["edge_time"] == 0).sum()) == 3)
+    check("example 1: everything else is the default",
+          set(on[0]["edge_time"].tolist()) == {0.0, float(UNKNOWN_RECENCY)})
+
+    check("example 2: four recency levels",
+          sorted(set(on[1]["edge_time"].tolist())) == [0.0, 1.0, 2.0, float(UNKNOWN_RECENCY)])
+    check("example 2: the just-moved piece is the king on f2",
+          sources_with(on[1], 0) == ["f2"])
+    check("example 2: one ply earlier is the rook on e1",
+          sources_with(on[1], 1) == ["e1"])
+    check("example 2: two plies earlier is the pawn on f6",
+          sources_with(on[1], 2) == ["f6"])
+    check("the departed square e8 no longer carries a recency",
+          "e8" not in sources_with(on[1], 0) + sources_with(on[1], 1) + sources_with(on[1], 2))
+    check("test set (unroll=False) still carries edge_time",
+          row_to_graph(TEST_ROW, use_timing=True, unroll=False)[0]["edge_time"] is not None)
 
     # it must generalise to any depth, not just mate in 2
     b = chess.Board()

@@ -16,6 +16,8 @@ PIECE_TYPES = [chess.PAWN, chess.KNIGHT, chess.BISHOP, chess.ROOK,
                chess.QUEEN, chess.KING]  # for a pawns a moves edge means control,
 EDGE_TYPES = ["attacks", "defends", "moves", "pushes"]
 
+UNKNOWN_RECENCY = 20  # moved a long time ago, or never moved.
+
 
 def normalize_row(row):
     # Normalize the row
@@ -198,12 +200,27 @@ OUTPUT: simulated think time, normalised to [0, 1]
 2.0, 18.0, 0.35, 0.02 and 60.0 are hand-tuned values for plausible human think time.
 
 """
+<<<<<<< HEAD
 def simulate_think_time(rating,n_remaining,n_legal):
     base = 2.0 + 18.0 * (rating - 400) / 2600.0    # ~2..20 s across the rating range
     depth = 1.0 + 0.35 * (n_remaining - 1)         # the first move takes the longest
     branch = 1.0 + 0.02 * (n_legal - 20)           # more options, more time to discard
     seconds = base * depth * branch
     return min(max(seconds / 60.0, 0.0), 1.0) 
+=======
+
+
+def simulate_think_time(rating, n_remaining, n_legal):
+    # ~2..20 s across the rating range
+    base = 2.0 + 18.0 * (rating - 400) / 2600.0
+    # the first move takes the longest
+    depth = 1.0 + 0.35 * (n_remaining - 1)
+    # more options, more time to discard
+    branch = 1.0 + 0.02 * (n_legal - 20)
+    seconds = base * depth * branch
+    return min(max(seconds / 60.0, 0.0), 1.0)
+
+>>>>>>> c28ae30 (new graphs, improved prob to graph dataset script, minor structural changes)
 
 """
 Lichess only tags mateIn1..5, so a deeper mate has no tag 
@@ -246,22 +263,39 @@ def row_to_graph(row,use_timing=False, unroll=True):
     # We only keep queen promotions. Drop puzzles where the solver under-promotes.
     if any(len(m) == 5 and m[4] in "rbn" for m in solution[::2]):
         return []
+<<<<<<< HEAD
     
+=======
+    # We only keep queen promotions. Drop puzzles where the solver under-promotes.
+    if any(len(m) == 5 and m[4] in "rbn" for m in solution[::2]):
+        return []
+
+    played = 1
+    last_moved = {}
+    update_last_moved(last_moved, chess.Move.from_uci(moves[0]), played)
+>>>>>>> c28ae30 (new graphs, improved prob to graph dataset script, minor structural changes)
 
     played=1
     last_moved={}
     update_last_moved(last_moved,chess.Move.from_uci(moves[0]),played)
 
+<<<<<<< HEAD
     solver=board.turn #who moves now is the solver
 
     examples=[]
     k=0 #how many solver moves have been applied
     replay= board.copy() # we need to validate the line first
+=======
+    examples = []
+    k = 0  # how many solver moves have been applied
+    replay = board.copy()  # we need to validate the line first
+>>>>>>> c28ae30 (new graphs, improved prob to graph dataset script, minor structural changes)
     try:
         for uci in solution:
             replay.push_uci(uci)
     except ValueError:
         return []
+<<<<<<< HEAD
     for uci in solution: 
         if board.turn == solver:
             k=k+1
@@ -294,16 +328,59 @@ def row_to_graph(row,use_timing=False, unroll=True):
             "fen": board.fen(),               # to rebuild the position later
             "solution": solution,             # the script, used at eval time
         })
+=======
+    for uci in solution:
+        if board.turn == solver:
+            k = k+1
+            n_remaining = n_total-k+1
+            legal = build_legal_moves(board)
+            x = build_node_features(board)
+            edge_index, edge_attr = build_edge(board)
+            edge_time = None
+            t_value = None
+            if use_timing:
+                t_value = simulate_think_time(
+                    row['Rating'], n_remaining, len(legal))
+                t = np.full((64, 1), t_value, dtype=np.float32)
+                x = np.concatenate([x, t], axis=1)
+                edge_time = build_edge_time(edge_index, last_moved, played)
+            examples.append({
+                # what the network reads
+                "x": x,
+                "edge_index": edge_index,
+                "edge_attr": edge_attr,
+                "edge_time": edge_time,
+                # what it has to predict
+                "y": build_label([uci]),
+                "legal_moves": legal,
+                "think_time": t_value,
+                # bookkeeping: for analysis, not for the network
+                "n_remaining": n_total - k + 1,   # true depth of THIS position
+                "puzzle_n": n_total,              # depth of the whole puzzle
+                "puzzle_id": row.get("PuzzleId"),  # to check for split leakage
+                "rating": row["Rating"],
+                "fen": board.fen(),               # to rebuild the position later
+                "solution": solution,             # the script, used at eval time
+            })
+>>>>>>> c28ae30 (new graphs, improved prob to graph dataset script, minor structural changes)
 
             if not unroll:
                 break
 
+<<<<<<< HEAD
         move=chess.Move.from_uci(uci)
         board.push(move)
         played=played+1
         update_last_moved(last_moved,move,played)
         
  
+=======
+        move = chess.Move.from_uci(uci)
+        board.push(move)
+        played = played+1
+        update_last_moved(last_moved, move, played)
+
+>>>>>>> c28ae30 (new graphs, improved prob to graph dataset script, minor structural changes)
     return examples
 
 """
@@ -311,6 +388,14 @@ ply: è la semi-mossa, quindi la mossa di un solo giocatore
 INPUT:board edge_idex (2, E), last_moved ()dict square --> ply it arrived on), played (quante semi mosse sono state giocate)
 OUTPUT: numpy array of lenght E, the recency of every edge
 
+<<<<<<< HEAD
+=======
+"""
+ply: è la semi-mossa, quindi la mossa di un solo giocatore 
+INPUT:board edge_idex (2, E), last_moved ()dict square --> ply it arrived on), played (quante semi mosse sono state giocate)
+OUTPUT: numpy array of lenght E, the recency of every edge
+
+>>>>>>> c28ae30 (new graphs, improved prob to graph dataset script, minor structural changes)
 ##INFO
 
 An edgy is generated by the piece standing on its SOURCE square, so the esge inherits that piece's recency : how many semi-mosse ago that piece last moved, 0 means "it's just moved"
@@ -321,6 +406,7 @@ UNKNOWN_RECENCY.
 The value fed to teh model must be scaled against its lamba_decay, The Plies (semi-mosse) range to 0..UNKOWN_RECENCY, so lambda around 0.1-02.
 """
 
+<<<<<<< HEAD
 UNKNOWN_RECENCY=20 #moved a long time ago, or never moved.
 
 
@@ -332,6 +418,17 @@ def build_edge_time(edge_index, last_moved, played):
             times[i]=played-last_moved[src]
         else:
             times[i]= UNKNOWN_RECENCY
+=======
+
+def build_edge_time(edge_index, last_moved, played):
+    times = np.empty(edge_index.shape[1], dtype=np.float32)
+    for i in range(edge_index.shape[1]):
+        src = int(edge_index[0, i])
+        if src in last_moved:
+            times[i] = played-last_moved[src]
+        else:
+            times[i] = UNKNOWN_RECENCY
+>>>>>>> c28ae30 (new graphs, improved prob to graph dataset script, minor structural changes)
     return times
 
 
@@ -341,6 +438,7 @@ OUTPUT:
 
 
 """
+<<<<<<< HEAD
 def update_last_moved(last_moved, move,played):
     last_moved.pop(move.from_square,None)
     last_moved[move.to_square]= played
@@ -572,5 +670,14 @@ def run_tests():
     print("everything works" if all(RESULTS)
           else "something is broken, look at the FAIL lines above")
  
+=======
+
+
+def update_last_moved(last_moved, move, played):
+    last_moved.pop(move.from_square, None)
+    last_moved[move.to_square] = played
+
+
+>>>>>>> c28ae30 (new graphs, improved prob to graph dataset script, minor structural changes)
 if __name__ == "__main__":
     fen_to_graph_tests()

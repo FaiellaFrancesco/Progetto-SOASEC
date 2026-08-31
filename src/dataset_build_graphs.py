@@ -18,6 +18,11 @@ def make_graph(chunk, unroll=True, use_timing=False):
     for record in chunk.to_dict('records'):
         g = row_to_graph(record, use_timing, unroll)
         if g:
+            # Needed to use pyarrow to handle parquet shards
+            for item in g:
+                for k, v in item.items():
+                    if isinstance(v, np.ndarray):
+                        item[k] = v.tolist()
             graphs.extend(g)
     return graphs
 
@@ -62,7 +67,7 @@ def make_db(
                     out_path = os.path.join(output_path, f"graphs_batch_{
                                             curr_batch:04d}.parquet")
                     tmp = pd.DataFrame(out)
-                    tmp.to_parquet(out_path, index=False)
+                    tmp.to_parquet(out_path, index=False, engine='pyarrow')
                     done = done[out_size:]
                     curr_batch += 1
 
@@ -82,7 +87,8 @@ def make_db(
                 out = done[:out_size]
                 out_path = os.path.join(output_path, f"graphs_batch_{
                                         curr_batch:04d}.parquet")
-                temp = pd.DataFrame(out).to_parquet(out_path, index=False)
+                temp = pd.DataFrame(out).to_parquet(
+                    out_path, index=False, engine='pyarrow')
                 done = done[out_size:]
                 curr_batch += 1
 
@@ -92,7 +98,7 @@ def make_db(
     if done:
         out_path = os.path.join(output_path, f"graphs_batch_{
                                 curr_batch:04d}.parquet")
-        pd.DataFrame(out).to_parquet(out_path, index=False)
+        pd.DataFrame(out).to_parquet(out_path, index=False, engine='pyarrow')
 
 
 if __name__ == '__main__':
@@ -114,5 +120,5 @@ if __name__ == '__main__':
         args.out_size,
         args.workers,
         unroll=True,
-        use_timing=False
+        use_timing=True
     )

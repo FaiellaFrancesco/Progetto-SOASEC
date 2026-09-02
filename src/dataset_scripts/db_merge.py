@@ -15,6 +15,7 @@ def merge_parquets(input_dirs, output_dir, hash_col):
     if not files:
         return
 
+    full_df = pd.DataFrame()
     for f in tqdm(files):
         full_df = pd.concat([pd.read_parquet(f)], ignore_index=True)
     # Drop duplicates on hash, keeping the top row

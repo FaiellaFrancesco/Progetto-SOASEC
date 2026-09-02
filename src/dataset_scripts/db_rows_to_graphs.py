@@ -64,8 +64,8 @@ def make_db(
                         done.append(g)
                 while len(done) >= out_size:
                     out = done[:out_size]
-                    out_path = os.path.join(output_path, f"graphs_batch_{
-                                            curr_batch:04d}.parquet")
+                    out_path = os.path.join(output_path,
+                                            f"graphs_batch_{curr_batch:04d}.parquet")
                     tmp = pd.DataFrame(out)
                     tmp.to_parquet(out_path, index=False, engine='pyarrow')
                     done = done[out_size:]
@@ -85,8 +85,8 @@ def make_db(
 
             while len(done) >= out_size:
                 out = done[:out_size]
-                out_path = os.path.join(output_path, f"graphs_batch_{
-                                        curr_batch:04d}.parquet")
+                out_path = os.path.join(output_path,
+                                        f"graphs_batch_{curr_batch:04d}.parquet")
                 temp = pd.DataFrame(out).to_parquet(
                     out_path, index=False, engine='pyarrow')
                 done = done[out_size:]
@@ -96,9 +96,9 @@ def make_db(
 
     # save any leftover records
     if done:
-        out_path = os.path.join(output_path, f"graphs_batch_{
-                                curr_batch:04d}.parquet")
-        pd.DataFrame(out).to_parquet(out_path, index=False, engine='pyarrow')
+        out_path = os.path.join(output_path,
+                                f"graphs_batch_{curr_batch:04d}.parquet")
+        pd.DataFrame(done).to_parquet(out_path, index=False, engine='pyarrow')
 
 
 if __name__ == '__main__':

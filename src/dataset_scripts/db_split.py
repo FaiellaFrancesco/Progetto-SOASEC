@@ -7,11 +7,14 @@ from sklearn.model_selection import train_test_split
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-i',
-                        "--input_path",
-                        type=str,
-                        required=True,) parser.add_argument(
-        '-o',
+    parser.add_argument(
+        "-i",
+        "--input_path",
+        type=str,
+        required=True,
+    )
+    parser.add_argument(
+        "-o",
         "--output_dir",
         type=str,
         default="./data_splits",

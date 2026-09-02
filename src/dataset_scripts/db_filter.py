@@ -16,7 +16,8 @@ if __name__ == '__main__':
     counts = df['MateIn'].value_counts()
 
     for n in range(1, 6):
-        c = counts.get(n)
-        print(f'MateIn{n}: {c} - {c/len(df) or 0:.3f}%')
+        c = int(counts.get(n, 0))
+        pct = (c / len(df)) if len(df) else 0.0
+        print(f"MateIn{n}: {c} - {pct:.3f}%")
 
-    df.to_csv('../dataset/lichess_db_puzzle_mates_only.csv')
+    df.to_csv("../dataset/lichess_db_puzzle_mates_only.csv", index=False)

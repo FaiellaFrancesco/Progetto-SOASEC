@@ -15,6 +15,7 @@ WORKERS = 8
 
 def make_graph(chunk, unroll=True, use_timing=False):
     graphs = []
+    dropped = 0                      # rows that produced no example at all
     for record in chunk.to_dict('records'):
         g = row_to_graph(record, use_timing, unroll)
         if g:
@@ -24,7 +25,11 @@ def make_graph(chunk, unroll=True, use_timing=False):
                     if isinstance(v, np.ndarray):
                         item[k] = v.tolist()
             graphs.extend(g)
-    return graphs
+        else:
+            dropped += 1
+    # the counters travel back with the results: make_graph runs in a separate
+    # process and cannot touch a shared counter
+    return graphs, len(chunk), dropped
 
 
 def make_db(
@@ -46,6 +51,10 @@ def make_db(
     curr_batch = 0
     done = []
 
+    rows_in = 0
+    rows_dropped = 0
+    examples_out = 0
+
     max_queue_size = max_workers * 2
     futures_queue = deque()
 
@@ -56,7 +65,10 @@ def make_db(
             # if the queue is full we wait on the oldest chunk to finish
             if len(futures_queue) >= max_queue_size:
                 fut = futures_queue.popleft()
-                res = fut.result()
+                res, n_rows, n_dropped = fut.result()
+                rows_in += n_rows
+                rows_dropped += n_dropped
+                examples_out += len(res)
                 pbar.update(1)
 
                 for g in res:
@@ -76,7 +88,10 @@ def make_db(
 
         while futures_queue:
             fut = futures_queue.popleft()
-            res = fut.result()
+            res, n_rows, n_dropped = fut.result()
+            rows_in += n_rows
+            rows_dropped += n_dropped
+            examples_out += len(res)
             pbar.update(1)
 
             for g in res:
@@ -99,6 +114,17 @@ def make_db(
         out_path = os.path.join(output_path,
                                 f"graphs_batch_{curr_batch:04d}.parquet")
         pd.DataFrame(done).to_parquet(out_path, index=False, engine='pyarrow')
+        curr_batch += 1
+
+    kept = rows_in - rows_dropped
+    print(f"\nrows read       : {rows_in:,}")
+    print(f"rows dropped    : {rows_dropped:,}  "
+          f"({rows_dropped / max(rows_in, 1):.2%})")
+    print(f"rows kept       : {kept:,}")
+    print(f"examples written: {examples_out:,}")
+    if kept:
+        print(f"examples per row: {examples_out / kept:.2f}")
+    print(f"parquet batches : {curr_batch}")
 
 
 if __name__ == '__main__':
@@ -109,6 +135,13 @@ if __name__ == '__main__':
     parser.add_argument("--chunk_size", type=int, default=CHUNK_SIZE)
     parser.add_argument("--out_size", type=int, default=OUT_SIZE)
     parser.add_argument("--workers", type=int, default=WORKERS)
+    # the two encoder flags, so both datasets of the ablation can be built with
+    # the same script: --timing on/off, --no-unroll for the test split
+    parser.add_argument("--timing", action="store_true",
+                        help="add think_time to the nodes and edge_time to the edges")
+    parser.add_argument("--no-unroll", dest="unroll", action="store_false",
+                        help="keep only the first solver move (test split)")
+    parser.set_defaults(unroll=True)
     args = parser.parse_args()
 
     os.makedirs(args.output_dir, exist_ok=True)
@@ -119,6 +152,6 @@ if __name__ == '__main__':
         args.chunk_size,
         args.out_size,
         args.workers,
-        unroll=True,
-        use_timing=True
+        unroll=args.unroll,
+        use_timing=args.timing
     )

@@ -143,6 +143,22 @@ def fen_to_graph_tests():
     check("no duplicates in legal moves", len(
         legal) == len(set(legal.tolist())))
 
+    # ---------------- simulate_think_time ----------------
+    print("\n--- simulate_think_time ---")
+    check("always inside [0, 1]",
+          all(0.0 <= simulate_think_time(r, d, l) <= 1.0
+              for r in range(400, 3001, 200)
+              for d in range(1, 11)
+              for l in range(0, 60, 5)))
+    check("a harder puzzle takes longer",
+          simulate_think_time(2400, 1, 20) > simulate_think_time(800, 1, 20))
+    check("more remaining depth takes longer",
+          simulate_think_time(1500, 5, 20) > simulate_think_time(1500, 1, 20))
+    check("more legal moves takes longer",
+          simulate_think_time(1500, 1, 40) > simulate_think_time(1500, 1, 10))
+    check("the extreme case is capped at 1",
+          simulate_think_time(3000, 10, 60) == 1.0)
+
     # ---------------- row_to_graph ----------------
     print("\n--- row_to_graph ---")
     for flag in (False, True):
@@ -172,22 +188,58 @@ def fen_to_graph_tests():
           len(row_to_graph({**TEST_ROW, "MateIn": float("nan")})) == 2)
     check("a broken FEN drops the row",
           len(row_to_graph({**TEST_ROW, "FEN": "nope"})) == 0)
+
+    # ---------------- underpromotion guard ----------------
+    print("\n--- underpromotion guard ---")
+    UNDER = {"PuzzleId": "u", "FEN": "r6k/1P6/8/8/8/8/8/6K1 b - - 0 1",
+             "Moves": "a8a7 b7b8n", "Rating": 1500, "Themes": "mate",
+             "MateIn": 1}
+    QUEEN = {**UNDER, "Moves": "a8a7 b7b8q"}
+    OPP = {"PuzzleId": "o", "FEN": "7k/1P6/8/8/8/8/K7/7r w - - 0 1",
+           "Moves": "b7b8n h1h2", "Rating": 1500, "Themes": "mate",
+           "MateIn": 1}
+    check("a solver underpromotion drops the row",
+          len(row_to_graph(UNDER)) == 0)
+    check("a queen promotion is kept", len(row_to_graph(QUEEN)) == 1)
+    check("an opponent underpromotion is harmless",
+          len(row_to_graph(OPP)) == 1)
+
+    # ---------------- corrupt line handling ----------------
     print("\n--- corrupt line handling ---")
     for name, mv in [("malformed move mid-line", "e5f6 e8e1 zzzz e1f1"),
                      ("illegal move mid-line",   "e5f6 e8e1 a1a2 e1f1"),
                      ("illegal move at the end", "e5f6 e8e1 g1f2 h8h1")]:
         check(f"{name} drops the row instead of raising",
               len(row_to_graph({**TEST_ROW, "Moves": mv})) == 0)
-        # ---------------- edge recency ----------------
+
+    off = row_to_graph(TEST_ROW)
+    on = row_to_graph(TEST_ROW, use_timing=True)
+
+    # ---------------- simulated think time on the examples ----------------
+    print("\n--- think time on the examples ---")
+    check("think_time is None when timing is off",
+          all(e["think_time"] is None for e in off))
+    check("think_time is set when timing is on",
+          all(e["think_time"] is not None for e in on))
+    check("think_time matches the last column of x",
+          all(abs(e["think_time"] - float(e["x"][0, -1])) < 1e-6 for e in on))
+    check("think_time is inside [0, 1]",
+          all(0 <= e["think_time"] <= 1 for e in on))
+    check("think_time is constant across the 64 nodes",
+          all(np.all(e["x"][:, -1] == e["x"][0, -1]) for e in on))
+    check("think_time differs between the two examples",
+          on[0]["think_time"] != on[1]["think_time"],
+          [round(e["think_time"], 3) for e in on])
+    check("think_time decreases as the mate gets closer",
+          on[0]["think_time"] > on[1]["think_time"])
+
+    # ---------------- edge recency ----------------
     print("\n--- edge recency ---")
 
     def sources_with(ex, value):
         ei, et = ex["edge_index"], ex["edge_time"]
         return sorted({chess.square_name(int(ei[0, j]))
                        for j in range(ei.shape[1]) if et[j] == value})
-
-    off = row_to_graph(TEST_ROW)
-    on = row_to_graph(TEST_ROW, use_timing=True)
 
     check("edge_time is None when timing is off",
           all(e["edge_time"] is None for e in off))
@@ -233,6 +285,29 @@ def fen_to_graph_tests():
         check(f"n={n} gives {n} examples with decreasing depth",
               len(res) == n and [e["n_remaining"] for e in res] == list(range(n, 0, -1)))
 
+    # ---------------- decode_move ----------------
+    print("\n--- decode_move ---")
+    for name, fen, src, dst, want in [
+            ("a white pawn reaching the 8th rank becomes a queen",
+             "8/1P6/8/8/8/8/8/K6k w - - 0 1", chess.B7, chess.B8, "b7b8q"),
+            ("a black pawn reaching the 1st rank becomes a queen",
+             "K6k/8/8/8/8/8/1p6/8 b - - 0 1", chess.B2, chess.B1, "b2b1q"),
+            ("a normal pawn move is left alone",
+             "8/8/8/8/8/8/1P6/K6k w - - 0 1", chess.B2, chess.B4, "b2b4"),
+            ("a rook reaching the 8th rank is NOT a promotion",
+             "8/8/8/8/8/8/8/KR5k w - - 0 1", chess.B1, chess.B8, "b1b8"),
+            ("a promotion by capture also becomes a queen",
+             "1n6/P7/8/8/8/8/8/K6k w - - 0 1", chess.A7, chess.B8, "a7b8q")]:
+        bb = chess.Board(fen)
+        m = decode_move(src * 64 + dst, bb)
+        check(name, m.uci() == want and m in bb.legal_moves, m.uci())
+
+    check("decode_move inverts build_label on every legal opening move",
+          all(decode_move(build_label([m.uci()]), start).uci()[:4] == m.uci()[:4]
+              for m in start.legal_moves))
+    check("y=3844 decodes back to e8e1",
+          decode_move(3844, board).uci() == "e8e1")
+
     # ---------------- summary ----------------
     print("\n--- summary ---")
     ei, ea = build_edge(board)
@@ -244,3 +319,7 @@ def fen_to_graph_tests():
     print(f"\n{sum(RESULTS)}/{len(RESULTS)} checks passed")
     print("everything works" if all(RESULTS)
           else "something is broken, look at the FAIL lines above")
+
+
+if __name__ == "__main__":
+    fen_to_graph_tests()

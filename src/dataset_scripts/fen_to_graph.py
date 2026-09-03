@@ -179,6 +179,34 @@ def build_label(solution):
 
 
 """
+INPUT: y (the class the model predicted, 0..4095), board (the position y refers to)
+OUTPUT: a chess.Move object, ready for board.push()
+
+build_label goes move -> integer, decode_move goes integer -> move: they are a
+PAIR and have to stay consistent.
+
+The model has 4096 classes, one per (from, to) pair, so it cannot say WHICH
+piece a pawn promotes to. build_label drops that information, so decode_move
+puts it back with the same convention the encoder uses: a pawn landing on rank
+1 or rank 8 always becomes a queen. Puzzles whose solution needs an
+under-promotion are already dropped by row_to_graph, so the two agree.
+
+The board is needed exactly for this check: without it we cannot tell whether
+the piece standing on the source square is a pawn.
+"""
+
+
+def decode_move(y, board):
+    src = y // 64
+    dst = y % 64
+    piece = board.piece_at(src)
+    if (piece is not None and piece.piece_type == chess.PAWN
+            and chess.square_rank(dst) in (0, 7)):
+        return chess.Move(src, dst, promotion=chess.QUEEN)
+    return chess.Move(src, dst)
+
+
+"""
 INPUT: chess.Board object
 OUTPUT: numpy array of the legal moves, encoded like y
 

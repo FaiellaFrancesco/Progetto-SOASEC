@@ -12,3 +12,5 @@ __pycache__/*
 dataset/*
 lichess_db_puzzle.csv
 lichess_db_puzzle_mates_only.csv
+progetto/
+src/progetto/

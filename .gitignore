@@ -3,6 +3,7 @@
 .venv/*
 __pycache__
 __pycache__/*
+TimeGNN-main/
 # DATATYPES
 *.tmp
 .~lock*

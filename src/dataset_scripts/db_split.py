@@ -64,8 +64,7 @@ if __name__ == "__main__":
     validate_ratios(args.train_ratio, args.val_ratio, args.test_ratio)
 
     if not os.path.exists(args.input_path):
-        print(f"Error: Input file '{
-              args.input_path}' not found.", file=sys.stderr)
+        print(f"Error: Input file {args.input_path} not found.", file=sys.stderr)
         sys.exit(1)
 
     print(f"Loading dataset from: {args.input_path}")
@@ -119,12 +118,9 @@ if __name__ == "__main__":
     df_test.to_csv(test_path, index=False)
 
     print("\n--- Split Summary ---")
-    print(f"Train set:      {len(df_train):,} rows ({
-          len(df_train)/total_samples:.1%}) -> {train_path}")
-    print(f"Validation set: {len(df_val):,} rows ({
-          len(df_val)/total_samples:.1%}) -> {val_path}")
-    print(f"Test set:       {len(df_test):,} rows ({
-          len(df_test)/total_samples:.1%}) -> {test_path}")
+    print(f"Train set:      {len(df_train):,} rows ({len(df_train)/total_samples:.1%}) -> {train_path}")
+    print(f"Validation set: {len(df_val):,} rows ({len(df_val)/total_samples:.1%}) -> {val_path}")
+    print(f"Test set:       {len(df_test):,} rows ({len(df_test)/total_samples:.1%}) -> {test_path}")
 
     if args.stratify:
         print(f"\n--- {args.stratify} Distribution (%) ---")

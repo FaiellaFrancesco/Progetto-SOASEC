@@ -126,6 +126,12 @@ def fmt_depth(acc):
 
 def main():
     p = argparse.ArgumentParser()
+    p.add_argument("--edge-inputs", action="store_true",
+                   help="passa davvero delta_t e tipi di arco "
+                        "all'attenzione: model.restore_edge_inputs")
+    p.add_argument("--self-loops", action="store_true",
+                   help="un self-loop su ogni casella: "
+                        "model.with_self_loops")
     p.add_argument("--train", required=True, help="cartella parquet di training")
     p.add_argument("--val", required=True, help="cartella parquet di validation")
     p.add_argument("--out", required=True,
@@ -172,7 +178,9 @@ def main():
                          gat_hidden_dim_concat=args.hidden,
                          num_heads=args.heads,
                          dropout=args.dropout,
-                         attention_softmax=args.attention_softmax).to(device)
+                         attention_softmax=args.attention_softmax,
+                         edge_inputs=args.edge_inputs,
+                         self_loops=args.self_loops).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
     print(f"device      : {device}")

@@ -1,42 +1,24 @@
-"""
-evaluate_models.py
-
-The final measurement: the two trained models on the TEST set, which until now
-has never been touched.
-
-    python evaluate_models.py \\
-        --timing-ckpt ckpt/timing/best.pt --timing-data graphs/test \\
-        --plain-ckpt  ckpt/plain/best.pt  --plain-data  graphs/test_plain \\
-        --out results_test.json
-
-WHY TWO DATA FOLDERS
---------------------
-The two models take a different number of node features: 13 with timing (the
-think_time column) and 12 without. graphs/test was built with --timing, so it
-feeds the timing model; graphs/test_plain is the same rows built without it.
-Both come from the same test.csv in the same order, and the script CHECKS that
-the puzzles line up before comparing anything.
-
-WHY McNEMAR AND NOT TWO CONFIDENCE INTERVALS
----------------------------------------------
-The two models answer the SAME puzzles, so their answers are correlated.
-Comparing two independent proportions throws that away and loses power.
-McNemar looks only at the puzzles where the two disagree:
-
-    b = timing right, plain wrong
-    c = plain right, timing wrong
-
-Under the null hypothesis b and c come from the same coin. The puzzles both got
-right, or both got wrong, carry no information about which model is better and
-are correctly ignored.
-
-WHAT THE NUMBERS MEAN
----------------------
-This is the test set: these are the numbers for the report. They are measured
-once. Do not tune anything on them - the moment you go back and change a
-hyperparameter because of what you saw here, the test set stops being a test
-set and becomes a second validation set.
-"""
+# Run (final test-set measurement of the two trained models):
+#   python src/chess_eval/evaluation/evaluate_models.py \
+#       --timing-ckpt ckpt_fix/timing/best.pt --timing-data src/chess_eval/graphs/test \
+#       --plain-ckpt  ckpt_fix/plain/best.pt  --plain-data  src/chess_eval/graphs/test_plain \
+#       --out risultati/fix/results_test.json
+#
+# The final measurement: the two trained models on the TEST set (first move,
+# argmax over the legal moves), plus a McNemar test between them.
+#
+# Two data folders: the timing model takes 13 node features (with think_time),
+# the plain one 12. graphs/test is built with --timing, graphs/test_plain
+# without; both come from the same test.csv in the same order, and the script
+# CHECKS the puzzles line up before comparing.
+#
+# McNemar, not two confidence intervals: the models answer the SAME puzzles, so
+# their answers are correlated. McNemar looks only at the disagreements (b =
+# timing right / plain wrong, c = the reverse); puzzles both got right or both
+# got wrong carry no signal and are ignored.
+#
+# These are the report numbers: measured once. Do not tune anything on them, or
+# the test set quietly becomes a second validation set.
 
 import argparse
 import json
@@ -48,21 +30,17 @@ import numpy as np
 import torch
 from torch_geometric.loader import DataLoader
 
-from graph_dataset import ParquetGraphDataset, legal_mask
-from model import ChessMoveGNN
-
-
-"""
-INPUT: the path of a checkpoint written by train.py, and a device
-OUTPUT: (model in eval mode, the args it was trained with)
-
-The hyperparameters travel inside the checkpoint, so the architecture is
-rebuilt exactly as it was trained. Guessing them here would silently produce a
-different network and load the weights into the wrong shapes.
-"""
+from chess_eval.common.graph_dataset import ParquetGraphDataset, legal_mask
+from chess_eval.common.model import ChessMoveGNN
 
 
 def load_model(path, device):
+    """Rebuild the model from a checkpoint and load its weights (eval mode).
+
+    Returns (model, train args, epoch, best_val). The hyperparameters travel
+    inside the checkpoint, so the architecture is rebuilt exactly as trained --
+    guessing them would load the weights into the wrong shapes.
+    """
     ck = torch.load(path, map_location=device, weights_only=False)
     a = ck["args"]
     n_features = 13 if a["timing"] else 12
@@ -84,17 +62,12 @@ def load_model(path, device):
     return model, a, ck.get("epoch"), ck.get("best_val")
 
 
-"""
-INPUT: a model, the folder of test parquet, timing flag, device, batch size
-OUTPUT: dict with per-example arrays: correct, depth, puzzle_id, n_legal
-
-Runs the whole test set once. Returns per-example results rather than a summary
-because McNemar needs to know WHICH puzzles each model got right, not just how
-many.
-"""
-
-
 def predict_all(model, data_dir, with_time, device, batch_size=256):
+    """Run the whole test set once; return per-example arrays, not a summary.
+
+    McNemar needs to know WHICH puzzles each model got right, so this returns
+    correct / depth / puzzle_id / n_legal per example.
+    """
     ds = ParquetGraphDataset(data_dir, with_time=with_time,
                              keep_meta=True, shuffle=False)
     loader = DataLoader(ds, batch_size=batch_size)
@@ -116,17 +89,12 @@ def predict_all(model, data_dir, with_time, device, batch_size=256):
             "n_legal": np.array(nlegal, dtype=float)}
 
 
-"""
-INPUT: the per-example correctness and depth arrays
-OUTPUT: {n: {"n": count, "acc": .., "ci": ..}} plus "overall"
-
-The confidence interval is the normal approximation on a proportion. On n=5,
-where the test set has few puzzles, it is wide on purpose: it is the number
-that stops you from claiming a difference the data cannot support.
-"""
-
-
 def summarise(res, baseline_by_depth=None):
+    """Accuracy per mate depth plus overall, with a 95% normal-approx CI.
+
+    The CI is wide on purpose at n=5 (few puzzles): it is the number that stops
+    you claiming a difference the data cannot support.
+    """
     out = {}
     for d in sorted(set(res["depth"].tolist())):
         m = res["depth"] == d
@@ -144,17 +112,11 @@ def summarise(res, baseline_by_depth=None):
     return out
 
 
-"""
-INPUT: two boolean arrays of correctness, aligned example by example
-OUTPUT: dict with b, c, the chi-square statistic and the p-value
-
-McNemar with continuity correction. b and c are the disagreements; examples
-where the two models agree are ignored because they say nothing about which is
-better.
-"""
-
-
 def mcnemar(a_correct, b_correct):
+    """McNemar test with continuity correction on two aligned correctness arrays.
+
+    b and c are the disagreements; examples where both models agree are ignored.
+    """
     b = int(np.sum(a_correct & ~b_correct))   # first right, second wrong
     c = int(np.sum(~a_correct & b_correct))   # second right, first wrong
     n = b + c

@@ -4,6 +4,7 @@
 __pycache__
 __pycache__/*
 TimeGNN-main/
+ckpt/
 # DATATYPES
 *.tmp
 .~lock*
@@ -15,3 +16,8 @@ lichess_db_puzzle.csv
 lichess_db_puzzle_mates_only.csv
 progetto/
 src/progetto/
+dataset/harvey/
+venv312/
+src/chess_eval/graphs.zip
+*.bak
+*.egg-info/

@@ -1,0 +1,8 @@
+#   python3.11 -m venv ~/.venvs/soasec
+#   source ~/.venvs/soasec/bin/activate
+#   pip install -r requirements.txt
+chess==1.11.2
+pandas==3.0.5
+pyarrow==25.0.1
+numpy==2.4.6
+tqdm==4.70.0

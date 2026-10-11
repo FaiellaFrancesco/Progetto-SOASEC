@@ -1,0 +1,40 @@
+# Run (merge parquet shards from one or more dirs into a single file):
+#   python src/chess_eval/preprocessing/db_merge.py -i graphs/a graphs/b -o graphs/merged
+#
+# Collects every *.parquet under the input dirs (recursively) and writes them
+# as one <output>/merged.parquet.
+
+import os
+import glob
+import argparse
+import pandas as pd
+from tqdm import tqdm
+
+
+def merge_parquets(input_dirs, output_dir, hash_col):
+    files = []
+    for d in input_dirs:
+        files.extend(glob.glob(os.path.join(
+            d, "**", "*.parquet"), recursive=True))
+
+    if not files:
+        return
+
+    full_df = pd.DataFrame()
+    for f in tqdm(files):
+        full_df = pd.concat([pd.read_parquet(f)], ignore_index=True)
+    # optional de-dup on the hash column (left disabled)
+    # full_df.drop_duplicates(subset=[hash_col], keep='first', inplace=True)
+
+    os.makedirs(output_dir, exist_ok=True)
+    full_df.to_parquet(os.path.join(output_dir, "merged.parquet"), index=False)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-i', '--inputs', nargs='+', required=True)
+    parser.add_argument('-o', '--output', required=True)
+    parser.add_argument('--hash_col', default='id')
+
+    args = parser.parse_args()
+    merge_parquets(args.inputs, args.output, args.hash_col)
